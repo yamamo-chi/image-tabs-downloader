@@ -207,9 +207,22 @@ async function downloadSelected() {
     }
   }
 
-  if (count === 0) {
-    statusEl.textContent = 'No images could be downloaded.';
-    return;
+  // If only 1 file, download directly
+  if (count === 1 && selected.length === 1) {
+    statusEl.textContent = `Downloading single file...`;
+    const zipFiles = Object.keys(zip.files);
+    if (zipFiles.length > 0) {
+      const filename = zipFiles[0];
+      const content = await zip.file(filename).async('blob');
+      const url = URL.createObjectURL(content);
+      await chrome.downloads.download({
+        url: url,
+        filename: filename,
+        saveAs: false
+      });
+      statusEl.textContent = `Done! Downloaded ${filename}`;
+      return;
+    }
   }
 
   statusEl.textContent = `Zipping ${count} images...`;
@@ -240,15 +253,35 @@ async function downloadSelected() {
  */
 function getImageInfoFromPage() {
   try {
+    // Helper to get absolute URL
+    const getAbsoluteUrl = (url) => {
+      if (!url) return null;
+      try {
+        return new URL(url, document.baseURI).href;
+      } catch (e) {
+        return url;
+      }
+    };
+
     // gather <img> elements
-    const imgs = Array.from(document.getElementsByTagName('img')).filter(i => i.src);
-    // choose largest by natural size (fallback to displayed size)
+    // Also check for lazy loaded images (data-src, etc)
+    const imgs = Array.from(document.getElementsByTagName('img'));
+
     let best = null;
     let bestArea = 0;
+
     for (const i of imgs) {
+      // Check src first, then common lazy load attributes
+      const src = i.src || i.dataset.src || i.dataset.original || i.getAttribute('data-src');
+      if (!src) continue;
+
       const w = i.naturalWidth || i.width;
       const h = i.naturalHeight || i.height;
       const area = (w || 0) * (h || 0);
+
+      // Basic filter: ignore very small images (icons, tracking pixels)
+      if (area < 1000) continue;
+
       if (area > bestArea) {
         bestArea = area;
         best = i;
@@ -289,7 +322,9 @@ function getImageInfoFromPage() {
     }
 
     // Found best <img>
-    const src = best.src;
+    let src = best.src || best.dataset.src || best.dataset.original || best.getAttribute('data-src');
+    src = getAbsoluteUrl(src);
+
     const filename = (best.getAttribute('alt') && best.getAttribute('alt').trim()) ? (best.getAttribute('alt').trim().replace(/[^a-z0-9_\-\.]/gi, '_') + '.' + (src.split('.').pop().split('?')[0] || 'jpg')) : src.split('/').pop().split('?')[0];
 
     // Build a small thumbnail (try-catch because cross-origin might block)
