@@ -11,18 +11,18 @@ listEl.addEventListener('click', (e) => {
   if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') {
     const checkboxes = Array.from(listEl.querySelectorAll('.tab-row input[type=checkbox]'));
     const currentIndex = checkboxes.indexOf(e.target);
-    
+
     if (e.shiftKey && lastCheckedIndex !== null && lastCheckedIndex !== currentIndex) {
       const start = Math.min(lastCheckedIndex, currentIndex);
       const end = Math.max(lastCheckedIndex, currentIndex);
-      
+
       for (let i = start; i <= end; i++) {
         if (!checkboxes[i].disabled) {
           checkboxes[i].checked = e.target.checked;
         }
       }
     }
-    
+
     lastCheckedIndex = currentIndex;
   }
 });
@@ -155,7 +155,9 @@ async function downloadSelected() {
   let count = 0;
   let errors = 0;
 
-  for (const r of selected) {
+  const baseDate = new Date();
+  for (let i = 0; i < selected.length; i++) {
+    const r = selected[i];
     const tabId = parseInt(r.dataset.tabId, 10);
     try {
       // 1. Get image URL from page
@@ -173,7 +175,7 @@ async function downloadSelected() {
       }
 
       // 2. Fetch image data
-      statusEl.textContent = `Fetching ${count + 1}/${selected.length}: ${info.filename}`;
+      statusEl.textContent = `Fetching ${i + 1}/${selected.length}: ${info.filename}`;
       try {
         const response = await fetch(info.src);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -187,7 +189,12 @@ async function downloadSelected() {
           const base = filename.substring(0, filename.length - ext.length - 1);
           filename = `${base}_${tabId}.${ext}`;
         }
-        zip.file(filename, blob);
+
+        // Set date sequentially (increment by 2 minutes for each file) to preserve order
+        // FAT file systems have 2-second precision, so 1 second might be lost or rounded.
+        // Using 2 minutes ensures clear ordering.
+        const fileDate = new Date(baseDate.getTime() + i * 120000);
+        zip.file(filename, blob, { date: fileDate });
         count++;
       } catch (fetchErr) {
         console.error('Fetch error for', info.src, fetchErr);
