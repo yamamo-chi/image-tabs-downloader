@@ -4,6 +4,29 @@ const refreshBtn = document.getElementById('refresh');
 const downloadBtn = document.getElementById('downloadSelected');
 const selectAllBtn = document.getElementById('selectAll');
 
+
+let lastCheckedIndex = null;
+
+listEl.addEventListener('click', (e) => {
+  if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') {
+    const checkboxes = Array.from(listEl.querySelectorAll('.tab-row input[type=checkbox]'));
+    const currentIndex = checkboxes.indexOf(e.target);
+    
+    if (e.shiftKey && lastCheckedIndex !== null && lastCheckedIndex !== currentIndex) {
+      const start = Math.min(lastCheckedIndex, currentIndex);
+      const end = Math.max(lastCheckedIndex, currentIndex);
+      
+      for (let i = start; i <= end; i++) {
+        if (!checkboxes[i].disabled) {
+          checkboxes[i].checked = e.target.checked;
+        }
+      }
+    }
+    
+    lastCheckedIndex = currentIndex;
+  }
+});
+
 refreshBtn.addEventListener('click', refresh);
 downloadBtn.addEventListener('click', downloadSelected);
 selectAllBtn.addEventListener('click', selectAll);
