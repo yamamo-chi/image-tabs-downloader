@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Image Tabs Downloader",
+  "version": "1.0",
+  "description": "List specified tabs that show images and download their images using browser session (works for logged-in sites).",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "downloads",
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Bulk Image Saver"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
