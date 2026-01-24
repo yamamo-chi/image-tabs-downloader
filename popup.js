@@ -154,6 +154,8 @@ async function downloadSelected() {
   const zip = new JSZip();
   let count = 0;
   let errors = 0;
+  let singleFileBlob = null;
+  let singleFileName = null;
 
   const baseDate = new Date();
   for (let i = 0; i < selected.length; i++) {
@@ -177,17 +179,58 @@ async function downloadSelected() {
       // 2. Fetch image data
       statusEl.textContent = `Fetching ${i + 1}/${selected.length}: ${info.filename}`;
       try {
-        const response = await fetch(info.src);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
+        let blob;
+        try {
+          const response = await fetch(info.src);
+          if (response.status === 403) throw new Error('HTTP 403');
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          blob = await response.blob();
+        } catch (initialErr) {
+          if (initialErr.message.includes('403')) {
+            // Fallback to content script fetch to use page credentials/referer
+            const r = await chrome.scripting.executeScript({
+              target: { tabId: tabId },
+              func: fetchImageAsBase64,
+              args: [info.src]
+            });
+            const res = r?.[0]?.result;
+            if (res && res.data) {
+              const b = await fetch(res.data);
+              blob = await b.blob();
+            } else {
+              throw new Error(res?.error || initialErr.message);
+            }
+          } else {
+            throw initialErr;
+          }
+        }
 
         // 3. Add to ZIP
         // Ensure unique filename in zip
         let filename = info.filename || `image_${tabId}.jpg`;
+
+        // If filename has no extension, try to add one from blob type
+        if (!filename.includes('.') && blob && blob.type) {
+          const extMap = {
+            'image/jpeg': '.jpg',
+            'image/jpeg': '.jpeg',
+            'image/png': '.png',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+            'image/svg+xml': '.svg'
+          };
+          if (extMap[blob.type]) filename += extMap[blob.type];
+        }
+
         if (zip.file(filename)) {
           const ext = filename.split('.').pop();
           const base = filename.substring(0, filename.length - ext.length - 1);
           filename = `${base}_${tabId}.${ext}`;
+        }
+
+        if (selected.length === 1) {
+          singleFileBlob = blob;
+          singleFileName = filename;
         }
 
         // Set date sequentially (increment by 2 minutes for each file) to preserve order
@@ -208,21 +251,21 @@ async function downloadSelected() {
   }
 
   // If only 1 file, download directly
-  if (count === 1 && selected.length === 1) {
+  if (count === 1 && selected.length === 1 && singleFileBlob) {
     statusEl.textContent = `Downloading single file...`;
-    const zipFiles = Object.keys(zip.files);
-    if (zipFiles.length > 0) {
-      const filename = zipFiles[0];
-      const content = await zip.file(filename).async('blob');
-      const url = URL.createObjectURL(content);
+    const url = URL.createObjectURL(singleFileBlob);
+    try {
       await chrome.downloads.download({
         url: url,
-        filename: filename,
+        filename: singleFileName,
         saveAs: false
       });
-      statusEl.textContent = `Done! Downloaded ${filename}`;
-      return;
+      statusEl.textContent = `Done! Downloaded ${singleFileName}`;
+    } catch (e) {
+      console.error('Single download error', e);
+      statusEl.textContent = 'Error downloading single file: ' + e.message;
     }
+    return;
   }
 
   statusEl.textContent = `Zipping ${count} images...`;
@@ -359,3 +402,20 @@ function getImageInfoFromPage() {
 
 // auto-refresh on popup open
 refresh();
+
+// Helper injected into the page to fetch image with correct Referrer
+async function fetchImageAsBase64(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve({ data: reader.result });
+      reader.onerror = () => resolve({ error: 'Failed to read blob' });
+      reader.readAsDataURL(blob);
+    });
+  } catch (err) {
+    return { error: err.message };
+  }
+}
