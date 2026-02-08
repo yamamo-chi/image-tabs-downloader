@@ -233,10 +233,11 @@ async function downloadSelected() {
           singleFileName = filename;
         }
 
-        // Set date sequentially (increment by 2 minutes for each file) to preserve order
-        // FAT file systems have 2-second precision, so 1 second might be lost or rounded.
-        // Using 2 minutes ensures clear ordering.
-        const fileDate = new Date(baseDate.getTime() + i * 120000);
+        // タブの順番を保持するため、各ファイルに順次増加する日時を設定
+        // 10秒間隔で設定することで、ファイルマネージャーで更新日時順にソートした際に
+        // タブの順番通りに表示されるようにする
+        // （FATファイルシステムは2秒精度だが、10秒間隔なら確実に順序が保たれる）
+        const fileDate = new Date(baseDate.getTime() + i * 10000);
         zip.file(filename, blob, { date: fileDate });
         count++;
       } catch (fetchErr) {
