@@ -3,6 +3,8 @@ const statusEl = document.getElementById('status');
 const refreshBtn = document.getElementById('refresh');
 const downloadBtn = document.getElementById('downloadSelected');
 const selectAllBtn = document.getElementById('selectAll');
+const orderLtrEl = document.getElementById('orderLtr');
+const orderRtlEl = document.getElementById('orderRtl');
 
 
 let lastCheckedIndex = null;
@@ -228,16 +230,22 @@ async function downloadSelected() {
           filename = `${base}_${tabId}.${ext}`;
         }
 
+        // 連番順の設定を読み取る（ltr: 左→右, rtl: 右→左）
+        const isRtl = orderRtlEl && orderRtlEl.checked;
+        const digits = String(selected.length).length;
+        // ltr: i=0が1番, rtl: i=0がN番（最後のタブが1番）
+        const seqNum = isRtl ? (selected.length - i) : (i + 1);
+        const prefix = String(seqNum).padStart(digits, '0') + '_';
+        filename = prefix + filename;
+
         if (selected.length === 1) {
           singleFileBlob = blob;
           singleFileName = filename;
         }
 
-        // タブの順番を保持するため、各ファイルに順次増加する日時を設定
-        // 10秒間隔で設定することで、ファイルマネージャーで更新日時順にソートした際に
-        // タブの順番通りに表示されるようにする
-        // （FATファイルシステムは2秒精度だが、10秒間隔なら確実に順序が保たれる）
-        const fileDate = new Date(baseDate.getTime() + i * 10000);
+        // 更新日時も連番方向に合わせて設定（10秒間隔）
+        const dateOffset = isRtl ? (selected.length - 1 - i) : i;
+        const fileDate = new Date(baseDate.getTime() + dateOffset * 10000);
         zip.file(filename, blob, { date: fileDate });
         count++;
       } catch (fetchErr) {

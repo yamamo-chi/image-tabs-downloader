@@ -56,6 +56,26 @@
     button {
       margin-right: 6px;
     }
+
+    .order-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: #444;
+    }
+
+    .order-toggle label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+    }
+
+    .order-toggle input[type=radio] {
+      cursor: pointer;
+    }
   </style>
 </head>
 
@@ -65,6 +85,11 @@
     <button id="refresh">Refresh Tabs</button>
     <button id="downloadSelected">Download Selected</button>
     <button id="selectAll">Select All</button>
+  </div>
+  <div class="order-toggle">
+    <span>連番順:</span>
+    <label><input type="radio" name="tabOrder" id="orderLtr" value="ltr" checked> &#x2190; 左から右 (1, 2, 3...)</label>
+    <label><input type="radio" name="tabOrder" id="orderRtl" value="rtl"> &#x2192; 右から左 (...3, 2, 1)</label>
   </div>
   <div id="status" style="margin-top:8px;color:#444"></div>
   <div id="list"></div>
